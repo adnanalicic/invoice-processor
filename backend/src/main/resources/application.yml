@@ -39,7 +39,7 @@ logging:
 # 3. Use the app password (not your regular password) in EMAIL_IMAP_PASSWORD
 email:
   imap:
-    host: ${EMAIL_IMAP_HOST:imap.gmail.com}
+    host: ${EMAIL_IMAP_HOST:}
     port: ${EMAIL_IMAP_PORT:993}
     username: ${EMAIL_IMAP_USERNAME:}  # Your full Gmail address (e.g., yourname@gmail.com)
     password: ${EMAIL_IMAP_PASSWORD:}    # Gmail App Password (16 characters, no spaces)

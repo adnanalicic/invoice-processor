@@ -1,6 +1,9 @@
 package com.invoiceprocessor.adapter.out.email;
 
 import com.invoiceprocessor.application.port.out.EmailFetcher;
+import com.invoiceprocessor.application.port.out.IntegrationEndpointRepository;
+import com.invoiceprocessor.domain.entity.EndpointType;
+import com.invoiceprocessor.domain.entity.IntegrationEndpoint;
 import jakarta.mail.*;
 import jakarta.mail.Flags.Flag;
 import jakarta.mail.search.FlagTerm;
@@ -15,6 +18,7 @@ import org.springframework.stereotype.Component;
 import java.io.InputStream;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 
 @Component
@@ -22,42 +26,47 @@ public class ImapEmailFetcher implements EmailFetcher {
 
     private static final Logger logger = LoggerFactory.getLogger(ImapEmailFetcher.class);
 
-    private final String host;
-    private final int port;
-    private final String username;
-    private final String password;
-    private final boolean useSSL;
+    private final IntegrationEndpointRepository integrationEndpointRepository;
+    private final String defaultHost;
+    private final int defaultPort;
+    private final String defaultUsername;
+    private final String defaultPassword;
+    private final boolean defaultUseSSL;
 
     public ImapEmailFetcher(
+            IntegrationEndpointRepository integrationEndpointRepository,
             @Value("${email.imap.host:localhost}") String host,
             @Value("${email.imap.port:993}") int port,
             @Value("${email.imap.username:}") String username,
             @Value("${email.imap.password:}") String password,
             @Value("${email.imap.ssl:true}") boolean useSSL) {
-        this.host = host;
-        this.port = port;
-        this.username = username;
-        this.password = password;
-        this.useSSL = useSSL;
+        this.integrationEndpointRepository = integrationEndpointRepository;
+        this.defaultHost = host;
+        this.defaultPort = port;
+        this.defaultUsername = username;
+        this.defaultPassword = password;
+        this.defaultUseSSL = useSSL;
     }
 
     private Store connect() throws MessagingException {
-        logger.info("Connecting to IMAP server: {}:{} (SSL: {})", host, port, useSSL);
+        EmailConfig config = getConnectionConfig();
+        logger.info("Connecting to IMAP server: {}:{} (SSL: {})", config.host(), config.port(), config.useSSL());
+
         Properties props = new Properties();
         props.put("mail.store.protocol", "imap");
-        props.put("mail.imap.host", host);
-        props.put("mail.imap.port", port);
-        if (useSSL) {
+        props.put("mail.imap.host", config.host());
+        props.put("mail.imap.port", config.port());
+        if (config.useSSL()) {
             props.put("mail.imap.ssl.enable", "true");
-            props.put("mail.imap.ssl.trust", host);
+            props.put("mail.imap.ssl.trust", config.host());
         } else {
             props.put("mail.imap.starttls.enable", "true");
         }
 
         Session session = Session.getDefaultInstance(props);
         Store store = session.getStore("imap");
-        logger.debug("Attempting to connect with username: {}", username);
-        store.connect(host, port, username, password);
+        logger.debug("Attempting to connect with username: {}", config.username());
+        store.connect(config.host(), config.port(), config.username(), config.password());
         logger.info("Successfully connected to IMAP server");
         return store;
     }
@@ -193,5 +202,64 @@ public class ImapEmailFetcher implements EmailFetcher {
         
         return attachments;
     }
+
+    private EmailConfig getConnectionConfig() {
+        return integrationEndpointRepository.findByType(EndpointType.EMAIL_SOURCE)
+            .map(this::fromEndpoint)
+            .orElseGet(() -> {
+                logger.warn("No EMAIL_SOURCE integration endpoint configured. Falling back to application properties");
+                return new EmailConfig(defaultHost, defaultPort, defaultUsername, defaultPassword, defaultUseSSL);
+            });
+    }
+
+    private EmailConfig fromEndpoint(IntegrationEndpoint endpoint) {
+        Map<String, String> settings = endpoint.getSettings();
+        String host = valueOrDefault(settings, "host", "imapHost", defaultHost);
+        int port = parsePort(settings.getOrDefault("port", String.valueOf(defaultPort)));
+        String username = valueOrDefault(settings, "username", "user", defaultUsername);
+        String password = valueOrDefault(settings, "password", "pass", defaultPassword);
+        boolean useSsl = parseBoolean(settings.getOrDefault("ssl", String.valueOf(defaultUseSSL)));
+
+        if (host == null || host.isBlank()) {
+            host = defaultHost;
+        }
+        if (username == null || username.isBlank()) {
+            username = defaultUsername;
+        }
+        if (password == null || password.isBlank()) {
+            password = defaultPassword;
+        }
+
+        return new EmailConfig(host, port, username, password, useSsl);
+    }
+
+    private String valueOrDefault(Map<String, String> settings, String primaryKey, String secondaryKey, String fallback) {
+        String value = settings.get(primaryKey);
+        if ((value == null || value.isBlank()) && secondaryKey != null) {
+            value = settings.get(secondaryKey);
+        }
+        return (value == null || value.isBlank()) ? fallback : value;
+    }
+
+    private int parsePort(String portValue) {
+        try {
+            return Integer.parseInt(portValue);
+        } catch (NumberFormatException e) {
+            logger.warn("Invalid IMAP port value '{}', falling back to {}", portValue, defaultPort);
+            return defaultPort;
+        }
+    }
+
+    private boolean parseBoolean(String value) {
+        return Boolean.parseBoolean(value);
+    }
+
+    private record EmailConfig(
+        String host,
+        int port,
+        String username,
+        String password,
+        boolean useSSL
+    ) {}
 }
 
