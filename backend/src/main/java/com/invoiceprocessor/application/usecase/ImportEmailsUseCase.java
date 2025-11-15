@@ -45,7 +45,7 @@ public class ImportEmailsUseCase {
             LlmInvoiceExtractor llmExtractor,
             InvoiceProcessingService processingService,
             StorageService storageService,
-            @Value("${email.import.folder:INBOX}") String emailFolder) {
+            @Value("${email.import.folder:Test123}") String emailFolder) {
         this.emailFetcher = emailFetcher;
         this.stackRepository = stackRepository;
         this.documentRepository = documentRepository;

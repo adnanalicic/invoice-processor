@@ -1,0 +1,29 @@
+spring:
+  application:
+    name: mail-import
+
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:invoice_processor}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+        jdbc:
+          lob:
+            non_contextual_creation: true
+
+server:
+  port: 8081
+
+email:
+  import:
+    folder: ${EMAIL_IMPORT_FOLDER:Test123}
+    poll-interval-ms: ${EMAIL_IMPORT_POLL_INTERVAL_MS:30000}
