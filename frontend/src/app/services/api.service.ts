@@ -98,6 +98,25 @@ export class ApiService {
     return this.http.get<IntegrationEndpoint[]>(`${this.baseUrl}/admin/endpoints`);
   }
 
+  getEmailSources(): Observable<IntegrationEndpoint[]> {
+    return this.http.get<IntegrationEndpoint[]>(`${this.baseUrl}/admin/email-sources`);
+  }
+
+  createEmailSource(payload: { name: string; settings: Record<string, string> }): Observable<IntegrationEndpoint> {
+    return this.http.post<IntegrationEndpoint>(`${this.baseUrl}/admin/email-sources`, payload);
+  }
+
+  updateEmailSource(
+    id: string,
+    payload: { name: string; settings: Record<string, string> }
+  ): Observable<IntegrationEndpoint> {
+    return this.http.put<IntegrationEndpoint>(`${this.baseUrl}/admin/email-sources/${id}`, payload);
+  }
+
+  deleteEmailSource(id: string): Observable<void> {
+    return this.http.delete<void>(`${this.baseUrl}/admin/email-sources/${id}`);
+  }
+
   saveIntegrationEndpoint(
     type: string,
     payload: { name: string; settings: Record<string, string> }

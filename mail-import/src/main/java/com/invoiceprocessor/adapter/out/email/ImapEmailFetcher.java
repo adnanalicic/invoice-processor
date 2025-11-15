@@ -20,6 +20,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Properties;
+import java.util.UUID;
 
 @Component
 public class ImapEmailFetcher implements EmailFetcher {
@@ -50,6 +51,10 @@ public class ImapEmailFetcher implements EmailFetcher {
 
     private Store connect() throws MessagingException {
         EmailConfig config = getConnectionConfig();
+        return connect(config);
+    }
+
+    private Store connect(EmailConfig config) throws MessagingException {
         logger.info("Connecting to IMAP server: {}:{} (SSL: {})", config.host(), config.port(), config.useSSL());
 
         Properties props = new Properties();
@@ -75,7 +80,31 @@ public class ImapEmailFetcher implements EmailFetcher {
     public java.util.List<EmailMessage> fetchUnreadEmails(String folder) {
         java.util.List<EmailMessage> messages = new java.util.ArrayList<>();
 
-        try (Store store = connect()) {
+        List<IntegrationEndpoint> emailSources = integrationEndpointRepository.findAllByType(EndpointType.EMAIL_SOURCE);
+        if (emailSources.isEmpty()) {
+            logger.warn("No EMAIL_SOURCE integration endpoints configured. Falling back to application properties");
+            messages.addAll(fetchFromConfig(null, folder));
+            return messages;
+        }
+
+        for (IntegrationEndpoint endpoint : emailSources) {
+            String endpointFolder = endpoint.getSettings().getOrDefault("folder", folder);
+            try {
+                logger.info("Fetching emails for endpoint {} ({}) from folder {}", endpoint.getName(), endpoint.getId(), endpointFolder);
+                messages.addAll(fetchFromConfig(endpoint, endpointFolder));
+            } catch (Exception e) {
+                logger.error("Failed to fetch emails for endpoint {} ({}): {}", endpoint.getName(), endpoint.getId(), e.getMessage(), e);
+            }
+        }
+
+        return messages;
+    }
+
+    private List<EmailMessage> fetchFromConfig(IntegrationEndpoint endpoint, String folder) {
+        List<EmailMessage> messages = new ArrayList<>();
+
+        EmailConfig config = (endpoint != null) ? fromEndpoint(endpoint) : getConnectionConfig();
+        try (Store store = connect(config)) {
             logger.info("Opening folder: {}", folder);
             Folder emailFolder = store.getFolder(folder);
             if (emailFolder == null || !emailFolder.exists()) {
@@ -91,9 +120,11 @@ public class ImapEmailFetcher implements EmailFetcher {
             );
             logger.info("Found {} unread messages", unreadMessages.length);
 
+            String endpointId = endpoint != null ? endpoint.getId().toString() : null;
+
             for (Message message : unreadMessages) {
                 try {
-                    EmailMessage emailMessage = parseMessage((MimeMessage) message);
+                    EmailMessage emailMessage = parseMessage(endpointId, folder, (MimeMessage) message);
                     messages.add(emailMessage);
                     logger.debug("Parsed email: {} - {}", emailMessage.messageId(), emailMessage.subject());
                 } catch (Exception e) {
@@ -102,9 +133,6 @@ public class ImapEmailFetcher implements EmailFetcher {
             }
 
             emailFolder.close(false);
-        } catch (MessagingException e) {
-            logger.error("MessagingException while fetching emails: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to fetch emails: " + e.getMessage(), e);
         } catch (Exception e) {
             logger.error("Unexpected error while fetching emails: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to fetch emails: " + e.getMessage(), e);
@@ -114,40 +142,54 @@ public class ImapEmailFetcher implements EmailFetcher {
     }
 
     @Override
-    public void markAsRead(String messageId, String folder) {
-        try (Store store = connect()) {
-            logger.debug("Marking email {} as read in folder {}", messageId, folder);
-            Folder emailFolder = store.getFolder(folder);
-            if (emailFolder == null || !emailFolder.exists()) {
-                logger.error("Folder '{}' does not exist for marking email as read", folder);
-                return;
-            }
-            emailFolder.open(Folder.READ_WRITE);
-
-            Message[] messages = emailFolder.getMessages();
-            boolean found = false;
-            for (Message message : messages) {
-                String[] messageIds = message.getHeader("Message-ID");
-                if (messageIds != null && messageIds.length > 0 && messageIds[0].equals(messageId)) {
-                    message.setFlag(Flags.Flag.SEEN, true);
-                    found = true;
-                    logger.debug("Marked email {} as read", messageId);
-                    break;
+    public void markAsRead(String endpointId, String messageId, String folder) {
+        try {
+            IntegrationEndpoint endpoint = null;
+            if (endpointId != null && !endpointId.isBlank()) {
+                try {
+                    UUID id = UUID.fromString(endpointId);
+                    endpoint = integrationEndpointRepository.findById(id).orElse(null);
+                } catch (IllegalArgumentException ex) {
+                    logger.warn("Invalid endpointId '{}' when marking message as read, falling back to default connection", endpointId);
                 }
             }
 
-            if (!found) {
-                logger.warn("Email with Message-ID {} not found in folder {} to mark as read", messageId, folder);
-            }
+            EmailConfig config = endpoint != null ? fromEndpoint(endpoint) : getConnectionConfig();
 
-            emailFolder.close(true);
+            try (Store store = connect(config)) {
+                logger.debug("Marking email {} as read in folder {} for endpoint {}", messageId, folder, endpointId);
+                Folder emailFolder = store.getFolder(folder);
+                if (emailFolder == null || !emailFolder.exists()) {
+                    logger.error("Folder '{}' does not exist for marking email as read", folder);
+                    return;
+                }
+                emailFolder.open(Folder.READ_WRITE);
+
+                Message[] messages = emailFolder.getMessages();
+                boolean found = false;
+                for (Message message : messages) {
+                    String[] messageIds = message.getHeader("Message-ID");
+                    if (messageIds != null && messageIds.length > 0 && messageIds[0].equals(messageId)) {
+                        message.setFlag(Flags.Flag.SEEN, true);
+                        found = true;
+                        logger.debug("Marked email {} as read", messageId);
+                        break;
+                    }
+                }
+
+                if (!found) {
+                    logger.warn("Email with Message-ID {} not found in folder {} to mark as read", messageId, folder);
+                }
+
+                emailFolder.close(true);
+            }
         } catch (Exception e) {
-            logger.error("Failed to mark email {} as read in folder {}: {}", messageId, folder, e.getMessage(), e);
+            logger.error("Failed to mark email {} as read in folder {} for endpoint {}: {}", messageId, folder, endpointId, e.getMessage(), e);
             // Don't throw - we don't want to fail the whole import if marking as read fails
         }
     }
 
-    private EmailMessage parseMessage(MimeMessage message) throws Exception {
+    private EmailMessage parseMessage(String endpointId, String folder, MimeMessage message) throws Exception {
         String messageId = message.getHeader("Message-ID") != null
             ? message.getHeader("Message-ID")[0]
             : String.valueOf(message.getMessageNumber());
@@ -166,7 +208,7 @@ public class ImapEmailFetcher implements EmailFetcher {
         String body = extractBody(message);
         java.util.List<EmailAttachment> attachments = extractAttachments(message);
 
-        return new EmailMessage(messageId, from, to, subject, body, attachments);
+        return new EmailMessage(endpointId, folder, messageId, from, to, subject, body, attachments);
     }
 
     private String extractBody(Message message) throws Exception {
@@ -262,4 +304,3 @@ public class ImapEmailFetcher implements EmailFetcher {
         boolean useSSL
     ) {}
 }
-

@@ -43,7 +43,7 @@ public class EmailImportScheduler {
                 try {
                     logger.debug("Forwarding email {} - {}", email.messageId(), email.subject());
                     emailForwarder.forwardEmail(email);
-                    emailFetcher.markAsRead(email.messageId(), emailFolder);
+                    emailFetcher.markAsRead(email.endpointId(), email.messageId(), email.folder());
                     success++;
                 } catch (Exception ex) {
                     errors++;

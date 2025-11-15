@@ -7,6 +7,7 @@ import org.springframework.stereotype.Component;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Component
@@ -36,10 +37,23 @@ public class IntegrationEndpointRepositoryImpl implements IntegrationEndpointRep
     }
 
     @Override
+    public List<IntegrationEndpoint> findAllByType(EndpointType type) {
+        return jpaRepository.findAllByType(type)
+            .stream()
+            .map(IntegrationEndpointJpaEntity::toDomain)
+            .collect(Collectors.toList());
+    }
+
+    @Override
     public List<IntegrationEndpoint> findAll() {
         return jpaRepository.findAll()
             .stream()
             .map(IntegrationEndpointJpaEntity::toDomain)
             .collect(Collectors.toList());
+    }
+
+    @Override
+    public void deleteById(UUID id) {
+        jpaRepository.deleteById(id);
     }
 }

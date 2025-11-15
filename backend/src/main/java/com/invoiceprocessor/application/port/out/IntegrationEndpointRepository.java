@@ -11,5 +11,7 @@ public interface IntegrationEndpointRepository {
     IntegrationEndpoint save(IntegrationEndpoint endpoint);
     Optional<IntegrationEndpoint> findById(UUID id);
     Optional<IntegrationEndpoint> findByType(EndpointType type);
+    List<IntegrationEndpoint> findAllByType(EndpointType type);
     List<IntegrationEndpoint> findAll();
+    void deleteById(UUID id);
 }

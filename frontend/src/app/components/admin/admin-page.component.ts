@@ -29,6 +29,31 @@ import { ApiService, IntegrationEndpoint } from '../../services/api.service';
           <mat-card-title>Email Source Settings</mat-card-title>
         </mat-card-header>
         <mat-card-content>
+          <div class="email-sources-header">
+            <div class="email-sources-list">
+              <label>Email folders:</label>
+              <select #emailEndpointSelect (change)="onSelectEmailEndpoint(emailEndpointSelect.value)">
+                <option value="">New folder...</option>
+                <option *ngFor="let endpoint of emailEndpoints" [value]="endpoint.id">
+                  {{ endpoint.settings['folder'] || 'INBOX' }}
+                </option>
+              </select>
+            </div>
+            <div class="email-sources-actions">
+              <button mat-button color="primary" type="button" (click)="createNewEmailEndpoint()">
+                New
+              </button>
+              <button
+                mat-button
+                color="warn"
+                type="button"
+                (click)="deleteSelectedEmailEndpoint()"
+                [disabled]="!selectedEmailEndpointId"
+              >
+                Delete
+              </button>
+            </div>
+          </div>
           <form [formGroup]="emailForm" (ngSubmit)="saveEmailSettings()">
             <div class="grid">
               <mat-form-field appearance="outline">
@@ -116,6 +141,20 @@ import { ApiService, IntegrationEndpoint } from '../../services/api.service';
       display: flex;
       justify-content: flex-end;
     }
+
+    .email-sources-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 16px;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+
+    .email-sources-list select {
+      min-width: 220px;
+      padding: 4px 8px;
+    }
   `]
 })
 export class AdminPageComponent implements OnInit {
@@ -123,6 +162,8 @@ export class AdminPageComponent implements OnInit {
   storageForm: FormGroup;
   savingEmail = false;
   savingStorage = false;
+  emailEndpoints: IntegrationEndpoint[] = [];
+  selectedEmailEndpointId: string | null = null;
 
   constructor(
     private fb: FormBuilder,
@@ -149,9 +190,10 @@ export class AdminPageComponent implements OnInit {
   ngOnInit(): void {
     this.apiService.getIntegrationEndpoints().subscribe(endpoints => {
       const byType = this.mapEndpoints(endpoints);
-      this.patchEmailForm(byType['EMAIL_SOURCE']);
       this.patchStorageForm(byType['STORAGE_TARGET']);
     });
+
+    this.loadEmailSources();
   }
 
   private mapEndpoints(endpoints: IntegrationEndpoint[]): Record<string, IntegrationEndpoint> {
@@ -201,13 +243,21 @@ export class AdminPageComponent implements OnInit {
       ssl: String(this.emailForm.value.ssl)
     };
 
-    this.apiService.saveIntegrationEndpoint('EMAIL_SOURCE', {
+    const payload = {
       name: 'Email Source',
       settings
-    }).subscribe({
-      next: () => {
+    };
+
+    const request$ = this.selectedEmailEndpointId
+      ? this.apiService.updateEmailSource(this.selectedEmailEndpointId, payload)
+      : this.apiService.createEmailSource(payload);
+
+    request$.subscribe({
+      next: (endpoint) => {
         this.savingEmail = false;
         this.snackBar.open('Email settings saved', 'Close', { duration: 2500 });
+        this.selectedEmailEndpointId = endpoint.id;
+        this.loadEmailSources();
       },
       error: (err) => {
         this.savingEmail = false;
@@ -239,6 +289,82 @@ export class AdminPageComponent implements OnInit {
       error: (err) => {
         this.savingStorage = false;
         this.snackBar.open(err.error?.message || 'Failed to save storage settings', 'Close', { duration: 3000 });
+      }
+    });
+  }
+
+  private loadEmailSources() {
+    this.apiService.getEmailSources().subscribe(endpoints => {
+      this.emailEndpoints = endpoints;
+      if (this.selectedEmailEndpointId) {
+        const selected = this.emailEndpoints.find(e => e.id === this.selectedEmailEndpointId);
+        if (selected) {
+          this.patchEmailForm(selected);
+          return;
+        }
+      }
+      if (this.emailEndpoints.length > 0) {
+        this.selectedEmailEndpointId = this.emailEndpoints[0].id;
+        this.patchEmailForm(this.emailEndpoints[0]);
+      } else {
+        this.selectedEmailEndpointId = null;
+        this.emailForm.reset({
+          host: '',
+          port: 993,
+          username: '',
+          password: '',
+          folder: 'INBOX',
+          ssl: true
+        });
+      }
+    });
+  }
+
+  onSelectEmailEndpoint(id: string) {
+    if (!id) {
+      this.selectedEmailEndpointId = null;
+      this.emailForm.reset({
+        host: '',
+        port: 993,
+        username: '',
+        password: '',
+        folder: 'INBOX',
+        ssl: true
+      });
+      return;
+    }
+    this.selectedEmailEndpointId = id;
+    const endpoint = this.emailEndpoints.find(e => e.id === id);
+    if (endpoint) {
+      this.patchEmailForm(endpoint);
+    }
+  }
+
+  createNewEmailEndpoint() {
+    this.selectedEmailEndpointId = null;
+    this.emailForm.reset({
+      host: '',
+      port: 993,
+      username: '',
+      password: '',
+      folder: 'INBOX',
+      ssl: true
+    });
+  }
+
+  deleteSelectedEmailEndpoint() {
+    if (!this.selectedEmailEndpointId) {
+      return;
+    }
+    const id = this.selectedEmailEndpointId;
+    this.apiService.deleteEmailSource(id).subscribe({
+      next: () => {
+        this.snackBar.open('Email inbox deleted', 'Close', { duration: 2500 });
+        this.selectedEmailEndpointId = null;
+        this.loadEmailSources();
+      },
+      error: (err) => {
+        this.snackBar.open(err.error?.message || 'Failed to delete email inbox', 'Close', { duration: 3000 });
       }
     });
   }

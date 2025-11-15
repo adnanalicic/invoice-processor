@@ -9,6 +9,7 @@ public interface EmailFetcher {
 
     /**
      * Fetches unread emails from the specified folder.
+     * May aggregate emails from multiple configured email source endpoints.
      *
      * @param folder The mailbox folder to fetch from (e.g., "INBOX")
      * @return List of email messages
@@ -18,15 +19,18 @@ public interface EmailFetcher {
     /**
      * Marks an email as read.
      *
+     * @param endpointId The identifier of the email source endpoint
      * @param messageId The unique identifier of the email message
      * @param folder The folder where the email is located
      */
-    void markAsRead(String messageId, String folder);
+    void markAsRead(String endpointId, String messageId, String folder);
 
     /**
      * Represents an email message with its content and attachments.
      */
     record EmailMessage(
+        String endpointId,
+        String folder,
         String messageId,
         String from,
         String to,
@@ -44,4 +48,3 @@ public interface EmailFetcher {
         java.io.InputStream content
     ) {}
 }
-
