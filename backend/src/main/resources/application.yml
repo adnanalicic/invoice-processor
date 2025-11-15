@@ -1,0 +1,56 @@
+spring:
+  application:
+    name: invoice-processor
+  
+  datasource:
+    url: jdbc:postgresql://${DB_HOST:localhost}:${DB_PORT:5432}/${DB_NAME:invoice_processor}
+    username: ${DB_USER:postgres}
+    password: ${DB_PASSWORD:postgres}
+    driver-class-name: org.postgresql.Driver
+  
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    show-sql: false
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: true
+  
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    locations: classpath:db/migration
+
+server:
+  port: 8080
+
+logging:
+  level:
+    com.invoiceprocessor: DEBUG
+    org.springframework.web: INFO
+    org.hibernate.SQL: INFO  # Only log SQL on errors, not all queries
+    org.hibernate.type.descriptor.sql.BasicBinder: INFO  # Don't log parameter bindings
+
+# Email configuration (Gmail)
+# For Gmail, you need to:
+# 1. Enable 2-Factor Authentication
+# 2. Generate an App Password: https://myaccount.google.com/apppasswords
+# 3. Use the app password (not your regular password) in EMAIL_IMAP_PASSWORD
+email:
+  imap:
+    host: ${EMAIL_IMAP_HOST:imap.gmail.com}
+    port: ${EMAIL_IMAP_PORT:993}
+    username: ${EMAIL_IMAP_USERNAME:}  # Your full Gmail address (e.g., yourname@gmail.com)
+    password: ${EMAIL_IMAP_PASSWORD:}    # Gmail App Password (16 characters, no spaces)
+    ssl: ${EMAIL_IMAP_SSL:true}
+  import:
+    folder: ${EMAIL_IMPORT_FOLDER:Test123}
+    poll-interval-ms: ${EMAIL_IMPORT_POLL_INTERVAL_MS:30000}
+
+# S3 Storage configuration
+s3:
+  endpoint: ${S3_ENDPOINT:http://localhost:9000}
+  access-key: ${S3_ACCESS_KEY:minioadmin}
+  secret-key: ${S3_SECRET_KEY:minioadmin}
+  bucket: ${S3_BUCKET:invoices}
