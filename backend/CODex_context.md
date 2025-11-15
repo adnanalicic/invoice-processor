@@ -53,6 +53,12 @@
     - Expects keys in `settings_json` such as `endpoint`, `accessKey`, `secretKey`, `bucket`, `region`, and `forcePathStyle`.
   - Responsible for bucket creation (on first use) and file upload.
 
+- `adapter.in.web.DocumentController`
+  - Handles document-related operations such as re-extraction and content retrieval.
+  - Endpoints:
+    - `POST /api/documents/{documentId}/reextract` — triggers re-extraction for a document.
+    - `GET /api/documents/{documentId}/content` — streams the underlying file from storage (PDF/text) for inline viewing by the frontend.
+
 ## Admin API for Integrations
 - `adapter.in.web.AdminController`
   - Base path: `/api/admin`.
@@ -87,4 +93,3 @@
   - Manual uploads.
   - Admin configuration for storage and email sources.
 - Admin UI behaviour (including how multiple email inboxes are edited) is documented in `frontend/CODex_context.md` and implemented in Angular components such as `admin-page.component.ts`.
-

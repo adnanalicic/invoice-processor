@@ -14,6 +14,7 @@ import { MatButtonModule } from '@angular/material/button';
       <button mat-button routerLink="/stacks">Stacks</button>
       <button mat-button routerLink="/simulate">Simulate</button>
       <button mat-button routerLink="/manual-upload">Manual Upload</button>
+       <button mat-button routerLink="/workflow">Workflow</button>
       <button mat-button routerLink="/admin">Admin</button>
     </mat-toolbar>
     <div style="padding: 20px;">

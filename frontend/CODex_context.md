@@ -32,6 +32,22 @@
     - The form fields map directly to the `settings` JSON for `EMAIL_SOURCE`:
       - `host`, `port`, `username`, `password`, `folder`, `ssl`.
 
+- `src/app/components/workflow/workflow-page.component.ts`
+  - “Workflow Designer” view, inspired by tools like n8n.
+  - Provides a visual overview of:
+    - Email input nodes (one per `EMAIL_SOURCE` endpoint).
+    - A central “Invoice Processor” node representing the backend processing pipeline.
+    - Output nodes such as the S3/MinIO storage target.
+  - Reads configuration via `ApiService` and displays how inputs, processor, and outputs relate.
+  - For actual editing of nodes (adding inboxes, configuring outputs) it links back to the Admin page, which remains the single source of truth.
+
+- `src/app/components/stack-detail/stack-detail.component.ts`
+  - Stack details view showing metadata and the list of documents in a stack.
+  - Integrates with the backend document API to support in-place document preview:
+    - For `PDF_ATTACHMENT` and `EMAIL_BODY` documents, a **Preview** button is shown.
+    - When clicked, the component loads `/api/documents/{id}/content` into an `<iframe>` on the right half of the page.
+    - Uses a split layout where the left side is the documents table and the right side is the preview; on small screens it stacks vertically.
+
 ## Configuration Flow
 - Storage target:
   - Admin configures endpoint via the “Storage Target Settings” form.
@@ -54,4 +70,3 @@
 ## URLs & Deployment Notes
 - Frontend is typically served on its own origin (e.g. `http://localhost:4200` in dev).
 - All API calls are made to `/api/...`; in production, this is usually routed to the backend service.
-

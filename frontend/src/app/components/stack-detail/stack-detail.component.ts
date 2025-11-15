@@ -7,6 +7,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatChipsModule } from '@angular/material/chips';
 import { MatDialogModule, MatDialog } from '@angular/material/dialog';
 import { MatIconModule } from '@angular/material/icon';
+import { DomSanitizer, SafeResourceUrl } from '@angular/platform-browser';
 import { ApiService, StackDetailsResponse, DocumentDetails } from '../../services/api.service';
 import { InvoiceDetailsDialogComponent } from '../invoice-details-dialog/invoice-details-dialog.component';
 
@@ -62,56 +63,81 @@ import { InvoiceDetailsDialogComponent } from '../invoice-details-dialog/invoice
           <mat-card-title>Documents</mat-card-title>
         </mat-card-header>
         <mat-card-content>
-          <table mat-table [dataSource]="stack.documents" class="mat-elevation-z8">
-            <ng-container matColumnDef="id">
-              <th mat-header-cell *matHeaderCellDef>ID</th>
-              <td mat-cell *matCellDef="let doc">{{ doc.id.substring(0, 8) }}</td>
-            </ng-container>
+          <div class="documents-layout">
+            <div class="documents-table">
+              <table mat-table [dataSource]="stack.documents" class="mat-elevation-z8">
+                <ng-container matColumnDef="id">
+                  <th mat-header-cell *matHeaderCellDef>ID</th>
+                  <td mat-cell *matCellDef="let doc">{{ doc.id.substring(0, 8) }}</td>
+                </ng-container>
 
-            <ng-container matColumnDef="type">
-              <th mat-header-cell *matHeaderCellDef>Type</th>
-              <td mat-cell *matCellDef="let doc">{{ doc.type }}</td>
-            </ng-container>
+                <ng-container matColumnDef="type">
+                  <th mat-header-cell *matHeaderCellDef>Type</th>
+                  <td mat-cell *matCellDef="let doc">{{ doc.type }}</td>
+                </ng-container>
 
-            <ng-container matColumnDef="filename">
-              <th mat-header-cell *matHeaderCellDef>Filename</th>
-              <td mat-cell *matCellDef="let doc">{{ doc.filename || '-' }}</td>
-            </ng-container>
+                <ng-container matColumnDef="filename">
+                  <th mat-header-cell *matHeaderCellDef>Filename</th>
+                  <td mat-cell *matCellDef="let doc">{{ doc.filename || '-' }}</td>
+                </ng-container>
 
-            <ng-container matColumnDef="classification">
-              <th mat-header-cell *matHeaderCellDef>Classification</th>
-              <td mat-cell *matCellDef="let doc">
-                <mat-chip>{{ doc.classification }}</mat-chip>
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="classification">
+                  <th mat-header-cell *matHeaderCellDef>Classification</th>
+                  <td mat-cell *matCellDef="let doc">
+                    <mat-chip>{{ doc.classification }}</mat-chip>
+                  </td>
+                </ng-container>
 
-            <ng-container matColumnDef="extractionStatus">
-              <th mat-header-cell *matHeaderCellDef>Extraction Status</th>
-              <td mat-cell *matCellDef="let doc">
-                <mat-chip [color]="getExtractionStatusColor(doc.extractionStatus)">
-                  {{ doc.extractionStatus }}
-                </mat-chip>
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="extractionStatus">
+                  <th mat-header-cell *matHeaderCellDef>Extraction Status</th>
+                  <td mat-cell *matCellDef="let doc">
+                    <mat-chip [color]="getExtractionStatusColor(doc.extractionStatus)">
+                      {{ doc.extractionStatus }}
+                    </mat-chip>
+                  </td>
+                </ng-container>
 
-            <ng-container matColumnDef="actions">
-              <th mat-header-cell *matHeaderCellDef>Actions</th>
-              <td mat-cell *matCellDef="let doc">
-                <button mat-button color="primary" 
-                        *ngIf="doc.invoice" 
-                        (click)="viewInvoice(doc.invoice)">
-                  View Extraction
-                </button>
-                <button mat-button color="accent" 
-                        (click)="retryExtraction(doc.id)">
-                  Retry Extraction
-                </button>
-              </td>
-            </ng-container>
+                <ng-container matColumnDef="actions">
+                  <th mat-header-cell *matHeaderCellDef>Actions</th>
+                  <td mat-cell *matCellDef="let doc">
+                    <button mat-button color="primary" 
+                            *ngIf="doc.invoice" 
+                            (click)="viewInvoice(doc.invoice)">
+                      View Extraction
+                    </button>
+                    <button mat-button color="accent" 
+                            (click)="retryExtraction(doc.id)">
+                      Retry Extraction
+                    </button>
+                    <button mat-button 
+                            *ngIf="canPreview(doc)" 
+                            (click)="previewDocument(doc)">
+                      Preview
+                    </button>
+                  </td>
+                </ng-container>
 
-            <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-            <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-          </table>
+                <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
+                <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
+              </table>
+            </div>
+
+            <div class="document-preview">
+              <ng-container *ngIf="selectedDocument && previewUrl; else noPreview">
+                <h3>Preview: {{ selectedDocument.filename || selectedDocument.type }}</h3>
+                <iframe
+                  class="preview-frame"
+                  [src]="previewUrl"
+                  title="Document preview">
+                </iframe>
+              </ng-container>
+              <ng-template #noPreview>
+                <p class="preview-hint">
+                  Select a PDF or plain text document and click <strong>Preview</strong> to view it here.
+                </p>
+              </ng-template>
+            </div>
+          </div>
         </mat-card-content>
       </mat-card>
 
@@ -186,6 +212,57 @@ import { InvoiceDetailsDialogComponent } from '../invoice-details-dialog/invoice
     .step-connector.completed {
       background: #4caf50;
     }
+
+    .documents-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr);
+      gap: 16px;
+      align-items: stretch;
+    }
+
+    .documents-table {
+      min-width: 0;
+      overflow: auto;
+    }
+
+    .document-preview {
+      min-width: 0;
+      border-left: 1px solid #e0e0e0;
+      padding-left: 16px;
+      display: flex;
+      flex-direction: column;
+    }
+
+    .preview-frame {
+      width: 100%;
+      height: 500px;
+      border: 1px solid #e0e0e0;
+      border-radius: 4px;
+    }
+
+    .preview-hint {
+      font-size: 13px;
+      color: rgba(0, 0, 0, 0.6);
+      margin-top: 8px;
+    }
+
+    table {
+      width: 100%;
+    }
+
+    @media (max-width: 960px) {
+      .documents-layout {
+        grid-template-columns: 1fr;
+      }
+
+      .document-preview {
+        border-left: none;
+        border-top: 1px solid #e0e0e0;
+        padding-left: 0;
+        padding-top: 16px;
+        margin-top: 16px;
+      }
+    }
   `]
 })
 export class StackDetailComponent implements OnInit {
@@ -198,11 +275,15 @@ export class StackDetailComponent implements OnInit {
     { key: 'ERROR', label: 'Error' }
   ];
 
+  selectedDocument: DocumentDetails | null = null;
+  previewUrl: SafeResourceUrl | null = null;
+
   constructor(
     private route: ActivatedRoute,
     private router: Router,
     private apiService: ApiService,
-    private dialog: MatDialog
+    private dialog: MatDialog,
+    private sanitizer: DomSanitizer
   ) {}
 
   ngOnInit() {
@@ -257,6 +338,19 @@ export class StackDetailComponent implements OnInit {
       case 'ERROR': return 'warn';
       default: return '';
     }
+  }
+
+  canPreview(doc: DocumentDetails): boolean {
+    return doc.type === 'PDF_ATTACHMENT' || doc.type === 'EMAIL_BODY';
+  }
+
+  previewDocument(doc: DocumentDetails): void {
+    if (!this.canPreview(doc)) {
+      return;
+    }
+    this.selectedDocument = doc;
+    const url = `/api/documents/${doc.id}/content`;
+    this.previewUrl = this.sanitizer.bypassSecurityTrustResourceUrl(url);
   }
   isStepCompleted(stepKey: string): boolean {
     if (!this.stack) {

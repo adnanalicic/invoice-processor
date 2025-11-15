@@ -33,7 +33,6 @@ public class IntegrationEndpointJpaEntity {
     @Column(nullable = false)
     private EndpointType type;
 
-    @Lob
     @Column(name = "settings_json", nullable = false, columnDefinition = "TEXT")
     private String settingsJson;
 
@@ -81,7 +80,8 @@ public class IntegrationEndpointJpaEntity {
             return OBJECT_MAPPER.readValue(json, OBJECT_MAPPER.getTypeFactory()
                 .constructMapType(Map.class, String.class, String.class));
         } catch (Exception e) {
-            throw new RuntimeException("Failed to deserialize settings JSON", e);
+            // Be tolerant of legacy or malformed settings; callers can enforce required keys.
+            return Map.of();
         }
     }
 }
