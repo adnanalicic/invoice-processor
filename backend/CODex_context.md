@@ -1,4 +1,4 @@
-# Backend Service â€” Codex Context (2025-11-15)
+# Backend Service — Codex Context (2025-11-15)
 
 ## Role
 - Central HTTP API and business logic for invoice processing.
@@ -16,10 +16,10 @@
   - Columns: `id`, `name`, `type`, `settings_json`, `created_at`, `updated_at`.
   - `settings_json` is a JSON blob interpreted by various adapters (email, storage, etc.).
 - Endpoint types (`EndpointType` enum):
-  - `EMAIL_SOURCE` â€” IMAP inbox configurations used by mail-import.
+  - `EMAIL_SOURCE` — IMAP inbox configurations used by mail-import.
     - **Multiple** rows allowed (one per inbox/folder).
-  - `STORAGE_TARGET` â€” S3/MinIO endpoint used for file storage.
-  - `OUTPUT_DESTINATION` â€” reserved for future downstream integrations.
+  - `STORAGE_TARGET` — S3/MinIO endpoint used for file storage.
+  - `OUTPUT_DESTINATION` — reserved for future downstream integrations.
 - Database constraints:
   - Initial schema enforced a global `UNIQUE(type)`; migration `V3__Allow_multiple_email_sources.sql` relaxes this:
     - Multiple `EMAIL_SOURCE` rows are allowed.
@@ -34,13 +34,15 @@
     - Stacks, documents, and re-extraction operations.
     - Internal email-import endpoint (`EmailImportController`) used by mail-import.
     - Admin endpoints for integration configuration (`AdminController`).
+    - Chat endpoint (`ChatController`) for the frontend chat view (`POST /api/chat`).
 
 - `application.usecase.*`
   - Use cases encapsulating business logic.
   - Examples:
-    - `CreateManualStackUseCase` â€” manual uploads via the frontend.
-    - `ImportEmailsUseCase` â€” legacy email import path (now typically driven via mail-import and the internal API).
-    - `EmailSourceEndpointsUseCase` â€” CRUD for multiple `EMAIL_SOURCE` endpoints in `integration_endpoints`.
+    - `CreateManualStackUseCase` — manual uploads via the frontend.
+    - `ImportEmailsUseCase` — legacy email import path (now typically driven via mail-import and the internal API).
+    - `EmailSourceEndpointsUseCase` — CRUD for multiple `EMAIL_SOURCE` endpoints in `integration_endpoints`.
+    - `ChatUseCase` — thin wrapper around an OpenAI-compatible chat/completions API (can point to a local LM Studio server).
 
 - `adapter.out.db.*`
   - JPA entities and repositories, including:
@@ -56,8 +58,8 @@
 - `adapter.in.web.DocumentController`
   - Handles document-related operations such as re-extraction and content retrieval.
   - Endpoints:
-    - `POST /api/documents/{documentId}/reextract` â€” triggers re-extraction for a document.
-    - `GET /api/documents/{documentId}/content` â€” streams the underlying file from storage (PDF/text) for inline viewing by the frontend.
+    - `POST /api/documents/{documentId}/reextract` — triggers re-extraction for a document.
+    - `GET /api/documents/{documentId}/content` — streams the underlying file from storage (PDF/text) for inline viewing by the frontend.
 
 ## Admin API for Integrations
 - `adapter.in.web.AdminController`
@@ -92,4 +94,6 @@
   - Document re-extraction.
   - Manual uploads.
   - Admin configuration for storage and email sources.
-- Admin UI behaviour (including how multiple email inboxes are edited) is documented in `frontend/CODex_context.md` and implemented in Angular components such as `admin-page.component.ts`.
+  - Chat requests via `/api/chat` for the LLM chat view.
+- Frontend behaviour is documented in `frontend/CODex_context.md` and implemented in Angular components.
+

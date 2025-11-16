@@ -16,6 +16,7 @@
     - Stacks, documents, manual uploads, re-extraction.
     - Integration endpoints: `getIntegrationEndpoints`, `saveIntegrationEndpoint`.
     - Email sources (multi-inbox): `getEmailSources`, `createEmailSource`, `updateEmailSource`, `deleteEmailSource`.
+    - Chat: `sendChatMessage` (POST `/api/chat`) for interacting with the configured LLM endpoint.
 
 - `src/app/components/admin/admin-page.component.ts`
   - Standalone component providing the admin UI for:
@@ -47,6 +48,12 @@
     - For `PDF_ATTACHMENT` and `EMAIL_BODY` documents, a **Preview** button is shown.
     - When clicked, the component loads `/api/documents/{id}/content` into an `<iframe>` on the right half of the page.
     - Uses a split layout where the left side is the documents table and the right side is the preview; on small screens it stacks vertically.
+  - The preview pane also shows LLM extraction results (classification and, when present, creditor and amount) for the selected document.
+
+- `src/app/components/chat/chat-page.component.ts`
+  - Simple chat UI for interacting with the configured LLM (e.g. local LM Studio server exposed as an OpenAI-compatible API).
+  - Maintains a list of messages (`user` and `assistant`) and sends the full history to `/api/chat` via `ApiService.sendChatMessage`.
+  - Displays responses in a chat-style layout with bubbles for user and assistant messages.
 
 ## Configuration Flow
 - Storage target:

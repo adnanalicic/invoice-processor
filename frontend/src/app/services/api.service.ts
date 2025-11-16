@@ -123,6 +123,10 @@ export class ApiService {
   ): Observable<IntegrationEndpoint> {
     return this.http.put<IntegrationEndpoint>(`${this.baseUrl}/admin/endpoints/${type}`, payload);
   }
+
+  sendChatMessage(payload: { messages: { role: string; content: string }[] }): Observable<ChatResponse> {
+    return this.http.post<ChatResponse>(`${this.baseUrl}/chat`, payload);
+  }
 }
 
 export interface ImportEmailsResponse {
@@ -143,4 +147,8 @@ export interface IntegrationEndpoint {
   name: string;
   type: string;
   settings: Record<string, string>;
+}
+
+export interface ChatResponse {
+  reply: string;
 }
