@@ -37,3 +37,10 @@ email:
   import:
     folder: ${EMAIL_IMPORT_FOLDER:Test123}
     poll-interval-ms: ${EMAIL_IMPORT_POLL_INTERVAL_MS:30000}
+
+# LLM / OpenAI integration
+openai:
+  api:
+    key: ${OPENAI_API_KEY:}
+    url: ${OPENAI_API_URL:https://api.openai.com/v1/chat/completions}
+  model: ${OPENAI_MODEL:gpt-4o-mini}

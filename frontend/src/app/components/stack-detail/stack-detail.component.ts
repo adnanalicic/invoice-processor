@@ -125,6 +125,29 @@ import { InvoiceDetailsDialogComponent } from '../invoice-details-dialog/invoice
             <div class="document-preview">
               <ng-container *ngIf="selectedDocument && previewUrl; else noPreview">
                 <h3>Preview: {{ selectedDocument.filename || selectedDocument.type }}</h3>
+                <div class="preview-meta">
+                  <div>
+                    <strong>Classification:</strong>
+                    {{ selectedDocument.classification || 'UNKNOWN' }}
+                  </div>
+                  <ng-container *ngIf="selectedDocument.invoice; else notInvoice">
+                    <div>
+                      <strong>Creditor:</strong>
+                      {{ selectedDocument.invoice?.supplierName }}
+                    </div>
+                    <div>
+                      <strong>Amount:</strong>
+                      {{ selectedDocument.invoice?.totalAmount }}
+                      {{ selectedDocument.invoice?.currency }}
+                    </div>
+                  </ng-container>
+                  <ng-template #notInvoice>
+                    <div>
+                      <strong>Info:</strong>
+                      Not an invoice.
+                    </div>
+                  </ng-template>
+                </div>
                 <iframe
                   class="preview-frame"
                   [src]="previewUrl"
@@ -244,6 +267,14 @@ import { InvoiceDetailsDialogComponent } from '../invoice-details-dialog/invoice
       font-size: 13px;
       color: rgba(0, 0, 0, 0.6);
       margin-top: 8px;
+    }
+
+    .preview-meta {
+      font-size: 13px;
+      margin-bottom: 8px;
+      display: flex;
+      flex-direction: column;
+      gap: 4px;
     }
 
     table {
