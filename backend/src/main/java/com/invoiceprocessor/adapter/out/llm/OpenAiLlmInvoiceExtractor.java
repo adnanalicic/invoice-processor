@@ -156,6 +156,8 @@ public class OpenAiLlmInvoiceExtractor implements LlmInvoiceExtractor {
                     .put("content", prompt)))
             .toString();
 
+        logger.debug("Sending extraction request to LLM at {} with prompt: {}", apiUrl, body);
+
         HttpEntity<String> entity = new HttpEntity<>(body, headers);
         String response = restTemplate.postForObject(apiUrl, entity, String.class);
         if (response == null || response.isBlank()) {
@@ -231,4 +233,3 @@ public class OpenAiLlmInvoiceExtractor implements LlmInvoiceExtractor {
         );
     }
 }
-

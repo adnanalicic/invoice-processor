@@ -1,5 +1,7 @@
 package com.invoiceprocessor.application.usecase;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.web.client.RestTemplateBuilder;
 import org.springframework.http.HttpEntity;
@@ -13,6 +15,8 @@ import java.util.List;
 
 @Service
 public class ChatUseCase {
+
+    private static final Logger logger = LoggerFactory.getLogger(ChatUseCase.class);
 
     private final RestTemplate restTemplate;
     private final String apiKey;
@@ -61,11 +65,15 @@ public class ChatUseCase {
             root.set("messages", arr);
 
             String body = mapper.writeValueAsString(root);
+            logger.debug("Sending chat request to LLM at {} with payload: {}", apiUrl, body);
+
             HttpEntity<String> entity = new HttpEntity<>(body, headers);
             String response = restTemplate.postForObject(apiUrl, entity, String.class);
             if (response == null || response.isBlank()) {
                 return new ChatResponse("Empty response from model.");
             }
+
+            logger.debug("Received chat response from LLM: {}", response);
 
             var json = mapper.readTree(response);
             String reply = json.path("choices").path(0).path("message").path("content").asText("");
@@ -74,6 +82,7 @@ public class ChatUseCase {
             }
             return new ChatResponse(reply);
         } catch (Exception e) {
+            logger.error("Error talking to LLM: {}", e.getMessage(), e);
             return new ChatResponse("Error talking to model: " + e.getMessage());
         }
     }
@@ -82,4 +91,3 @@ public class ChatUseCase {
 
     public record ChatResponse(String reply) {}
 }
-

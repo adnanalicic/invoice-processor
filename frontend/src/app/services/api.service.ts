@@ -124,7 +124,7 @@ export class ApiService {
     return this.http.put<IntegrationEndpoint>(`${this.baseUrl}/admin/endpoints/${type}`, payload);
   }
 
-  sendChatMessage(payload: { messages: { role: string; content: string }[] }): Observable<ChatResponse> {
+  sendChatMessage(payload: { documentId?: string; messages: { role: string; content: string }[] }): Observable<ChatResponse> {
     return this.http.post<ChatResponse>(`${this.baseUrl}/chat`, payload);
   }
 }

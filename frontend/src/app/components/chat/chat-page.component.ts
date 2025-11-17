@@ -6,6 +6,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatInputModule } from '@angular/material/input';
 import { MatIconModule } from '@angular/material/icon';
 import { ApiService } from '../../services/api.service';
+import { StackDetailsResponse } from '../../services/api.service';
 
 interface ChatMessage {
   role: 'user' | 'assistant';
@@ -32,6 +33,21 @@ interface ChatMessage {
         </mat-card-subtitle>
       </mat-card-header>
       <mat-card-content>
+        <div class="pdf-upload">
+          <label class="pdf-label">PDF for Q&A (optional):</label>
+          <input
+            type="file"
+            accept="application/pdf"
+            (change)="onFileSelected($event)"
+            [disabled]="uploading"
+          />
+          <span class="pdf-status" *ngIf="currentDocumentName">
+            Using: {{ currentDocumentName }}
+          </span>
+          <span class="pdf-status" *ngIf="uploading">
+            Uploading PDF...
+          </span>
+        </div>
         <div class="chat-window">
           <div *ngFor="let msg of messages" class="chat-row" [class.user]="msg.role === 'user'" [class.assistant]="msg.role === 'assistant'">
             <div class="chat-bubble">
@@ -67,6 +83,23 @@ interface ChatMessage {
     .chat-card {
       max-width: 900px;
       margin: 0 auto;
+    }
+
+    .pdf-upload {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 12px;
+      font-size: 13px;
+    }
+
+    .pdf-label {
+      font-weight: 500;
+    }
+
+    .pdf-status {
+      color: rgba(0,0,0,0.7);
+      font-style: italic;
     }
 
     .chat-window {
@@ -145,6 +178,9 @@ export class ChatPageComponent {
   messages: ChatMessage[] = [];
   input = '';
   sending = false;
+  uploading = false;
+  currentDocumentId: string | null = null;
+  currentDocumentName: string | null = null;
 
   constructor(private apiService: ApiService) {}
 
@@ -166,9 +202,13 @@ export class ChatPageComponent {
     this.input = '';
     this.sending = true;
 
-    const payload = {
+    const payload: { documentId?: string; messages: { role: string; content: string }[] } = {
       messages: this.messages.map(m => ({ role: m.role, content: m.content }))
     };
+
+    if (this.currentDocumentId) {
+      payload.documentId = this.currentDocumentId;
+    }
 
     this.apiService.sendChatMessage(payload).subscribe({
       next: (res) => {
@@ -182,5 +222,69 @@ export class ChatPageComponent {
         this.sending = false;
       }
     });
+  }
+
+  onFileSelected(event: Event): void {
+    const input = event.target as HTMLInputElement;
+    if (!input.files || input.files.length === 0) {
+      return;
+    }
+
+    const file = input.files[0];
+    input.value = '';
+    this.uploadPdfForChat(file);
+  }
+
+  private uploadPdfForChat(file: File): void {
+    this.uploading = true;
+    this.currentDocumentId = null;
+    this.currentDocumentName = file.name;
+
+    const formData = new FormData();
+    formData.append('from', 'chat-upload@example.com');
+    formData.append('to', 'chat-upload@example.com');
+    formData.append('subject', file.name);
+    formData.append('attachments', file, file.name);
+
+    this.apiService.createManualStack(formData).subscribe({
+      next: (response) => {
+        if (!response.stackId) {
+          this.addSystemMessage('Failed to create stack for uploaded PDF.');
+          this.uploading = false;
+          return;
+        }
+
+        this.apiService.getStackDetails(response.stackId).subscribe({
+          next: (details: StackDetailsResponse) => {
+            const document =
+              details.documents.find(d => d.filename === file.name) ||
+              details.documents.find(d => d.type === 'PDF_ATTACHMENT') ||
+              details.documents[0];
+
+            if (!document) {
+              this.addSystemMessage('No document found for uploaded PDF.');
+              this.uploading = false;
+              return;
+            }
+
+            this.currentDocumentId = document.id;
+            this.addSystemMessage(`PDF "${file.name}" is ready for questions.`);
+            this.uploading = false;
+          },
+          error: () => {
+            this.addSystemMessage('Failed to load details for uploaded PDF.');
+            this.uploading = false;
+          }
+        });
+      },
+      error: () => {
+        this.addSystemMessage('Error uploading PDF for chat.');
+        this.uploading = false;
+      }
+    });
+  }
+
+  private addSystemMessage(text: string): void {
+    this.messages.push({ role: 'assistant', content: text });
   }
 }
